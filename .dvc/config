@@ -1,0 +1,6 @@
+[core]
+    remote = dataversioncontrol
+['remote "localstorage"']
+    url = ../AIWeek-3
+['remote "dataversioncontrol"']
+    url = E:/AI/Week-3
