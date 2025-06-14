@@ -22,7 +22,11 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-data
+# Replace with:
+data/*
+!data/.gitignore
+!data/*.dvc
+!data/MachineLearningRating_v3.txt
 
 
 # PyInstaller
