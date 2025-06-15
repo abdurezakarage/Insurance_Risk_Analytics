@@ -1,1 +1,6 @@
 # Add your project dependencies here
+pandas 
+matplotlib
+numpy
+scipy
+seaborn
