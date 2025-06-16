@@ -1,10 +1,11 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from xgboost import XGBRegressor, XGBClassifier
-from sklearn.metrics import mean_squared_error, r2_score, accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import mean_absolute_error,mean_squared_error, r2_score, accuracy_score, precision_score, recall_score, f1_score
 import shap
 from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
 import warnings
@@ -70,12 +71,6 @@ class modelTrain:
         #     print("All columns are numeric after preprocessing.")
         # Print columns with NaNs before filling
         nan_cols = self.df.columns[self.df.isna().any()].tolist()
-        # if nan_cols:
-        #     print("Columns with NaNs before filling:")
-        #     print(self.df[nan_cols].isna().sum())
-        # else:
-        #     print("No columns have NaNs before filling.")
-        # Fill any remaining NaN values in numeric columns with the median
         num_cols = self.df.select_dtypes(include=[np.number]).columns
         for col in num_cols:
             self.df[col] = self.df[col].fillna(self.df[col].median())
@@ -111,9 +106,10 @@ class modelTrain:
         for name, model in self.models.items():
             model.fit(self.X_train_c, self.y_train_c)
             preds = model.predict(self.X_test_c)
+            mae = mean_absolute_error(self.y_test_c, preds)
             rmse = np.sqrt(mean_squared_error(self.y_test_c, preds))
             r2 = r2_score(self.y_test_c, preds)
-            self.results[name] = {'RMSE': rmse, 'R2': r2}
+            self.results[name] = {'MAE': mae, 'RMSE': rmse, 'R2': r2}
 
     def train_classifiers(self):
         self.classifiers = {
@@ -151,7 +147,7 @@ class modelTrain:
     def print_results(self):
         print("\n--- Regression Model Performance ---")
         for name, metrics in self.results.items():
-            print(f"{name} → RMSE: {metrics['RMSE']:.2f}, R²: {metrics['R2']:.3f}")
+            print(f"{name} → MAE: {metrics['MAE']:.2f}, RMSE: {metrics['RMSE']:.2f}, R²: {metrics['R2']:.3f}")
 
         print("\n--- Classification Model Performance ---")
         for name, metrics in self.classification_results.items():
@@ -160,11 +156,32 @@ class modelTrain:
     def model_comparison_report(self):
         print("\n--- Regression Model Comparison ---")
         for name, metrics in self.results.items():
-            print(f"{name:15} | RMSE: {metrics['RMSE']:.2f} | R²: {metrics['R2']:.3f}")
+            print(f"{name:15} | MAE: {metrics['MAE']:.2f} | RMSE: {metrics['RMSE']:.2f} | R²: {metrics['R2']:.3f}")
         print("\n--- Classification Model Comparison ---")
         for name, metrics in self.classification_results.items():
             print(f"{name:15} | Accuracy: {metrics['Accuracy']:.2f} | F1: {metrics['F1']:.2f} | Precision: {metrics['Precision']:.2f} | Recall: {metrics['Recall']:.2f}")
-
+    #plot model comparision result as x axis model name and y axis mae
+    def MAE_plot_model_comparison(self):
+        plt.figure(figsize=(10, 6))
+        plt.bar(self.results.keys(), [self.results[name]['MAE'] for name in self.results.keys()], color='skyblue')
+        plt.xlabel('Model')
+        plt.ylabel('MAE')
+        plt.title('Model Comparison')
+    #plot model comparision result as x axis model name and y axis rmse 
+    def RMSE_plot_model_comparison(self):
+        plt.figure(figsize=(10, 6))
+        plt.bar(self.results.keys(), [self.results[name]['RMSE'] for name in self.results.keys()], color='lightgreen')
+        plt.xlabel('Model')
+        plt.ylabel('RMSE')
+        plt.title('Model Comparison')
+        
+    #plot model comparision result as x axis model name and y axis r2
+    def R2_plot_model_comparison(self):
+        plt.figure(figsize=(10, 6))
+        plt.bar(self.results.keys(), [self.results[name]['R2'] for name in self.results.keys()], color='salmon')
+        plt.xlabel('Model')
+        plt.ylabel('R2')
+        plt.title('Model Comparison')
     def shap_feature_importance(self, top_n=10):
         importances = {}
         best_reg_model = self.models['XGBoost']
@@ -173,10 +190,27 @@ class modelTrain:
         mean_abs_shap = np.abs(shap_values.values).mean(axis=0)
         feature_names = self.X_test_c.columns
         sorted_idx = np.argsort(mean_abs_shap)[::-1][:top_n]
-        print(f"\nTop {top_n} Most Influential Features (SHAP):")
-        for idx in sorted_idx:
-            print(f"{feature_names[idx]}: mean(|SHAP|) = {mean_abs_shap[idx]:.4f}")
         print("\nBusiness Interpretation:")
         for idx in sorted_idx:
             print(f"Feature '{feature_names[idx]}' increases/decreases the predicted claim amount by {mean_abs_shap[idx]:.2f} units on average, holding other factors constant.")
         return [(feature_names[idx], mean_abs_shap[idx]) for idx in sorted_idx]
+
+    def plot_random_forest_trees(self, n_trees=3, figsize=(20, 10)):
+        """
+        Plot the first n_trees from the trained Random Forest regressor.
+        """
+        from sklearn.tree import plot_tree
+        rf = self.models.get('RandomForest')
+        if rf is None:
+            print("RandomForest model not trained.")
+            return
+        for i in range(min(n_trees, len(rf.estimators_))):
+            plt.figure(figsize=figsize)
+            plot_tree(rf.estimators_[i],
+                      feature_names=self.X_train_c.columns,
+                      filled=True,
+                      max_depth=3,
+                      rounded=True,
+                      fontsize=8)
+            plt.title(f"Random Forest Tree #{i+1}")
+            plt.show()
